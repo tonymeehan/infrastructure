@@ -1,45 +1,39 @@
 apiVersion: rabbitmq.com/v1beta1
 kind: RabbitmqCluster
 metadata:
-  name: niyez-dev-rabbitmq
+  name: my-rabbitmq-cluster
 spec:
-  replicas: 3
+  replicas: 2
   resources:
     requests:
-      cpu: 100m
-      memory: 500Mi
+      memory: 16Gi
+      cpu: 4000m
     limits:
-      cpu: 100m
-      memory: 500Mi
-  rabbitmq:
-    additionalConfig: |
-      cluster_partition_handling = pause_minority
-      vm_memory_high_watermark_paging_ratio = 0.99
-      disk_free_limit.relative = 1.0
-      collect_statistics_interval = 10000
-  persistence:
-    storageClassName: rook-ceph-block
-    storage: "5Gi"
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-      - labelSelector:
-          matchExpressions:
-            - key: app.kubernetes.io/name
-              operator: In
-              values:
-              - niyez-dev-rabbitmq
-        topologyKey: kubernetes.io/hostname
+      memory: 16Gi
+      cpu: 4000m
   override:
     statefulSet:
       spec:
         template:
           spec:
-            containers: []
-            topologySpreadConstraints:
-            - maxSkew: 1
-              topologyKey: "topology.kubernetes.io/zone"
-              whenUnsatisfiable: DoNotSchedule
-              labelSelector:
-                matchLabels:
-                  app.kubernetes.io/name: niyez-dev-rabbitmq
+            nodeSelector:
+              restrict-scale-down: "true"
+            containers:
+            - name: rabbitmq
+              image: docker.io/library/rabbitmq:3.10.7-management
+              volumeMounts:
+              - mountPath: /etc/rabbitmq/definitions.json
+                subPath: definitions.json
+                name: definitions
+            volumes:
+            - name: definitions
+              configMap:
+                name: definitions
+  rabbitmq:
+    envConfig: |
+      RABBITMQ_DISTRIBUTION_BUFFER_SIZE=100000
+    additionalConfig: |
+      vm_memory_high_watermark.absolute = 32025908428
+      loopback_users.guest = false
+      disk_free_limit.absolute = 4GB
+      load_definitions = /etc/rabbitmq/definitions.json
